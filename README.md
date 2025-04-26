@@ -2,6 +2,14 @@
 
 Este proyecto compara el rendimiento y uso de memoria entre dos métodos de asignación dinámica de memoria: `new/delete` (estándar en C++) y el sistema de asignación `Buddy System`, aplicado al procesamiento de imágenes (rotación y escalado).
 
+## Videos
+
+### Primera parte
+https://youtu.be/Ve0UeIsj1EI
+
+### Segunda parte
+https://youtu.be/6pMjUgpHGyU
+
 ## Resultados Observados
 
 ## ¿Qué diferencia observaste en el tiempo de procesamiento entre los dos modos de asignación de memoria?
