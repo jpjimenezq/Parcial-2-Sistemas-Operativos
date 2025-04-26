@@ -12,7 +12,7 @@ public:
     void invertirColores();
     void guardarImagen(const std::string &nombreArchivo) const;
     void mostrarInfo() const;  // ✅ Declaración como const
-    void rotar();
+    void rotar(float grados);
     void escalar(float factor);
 
 private:

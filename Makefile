@@ -26,6 +26,10 @@ $(TARGET): $(OBJS)
 clean:
 	rm -f $(OBJS) $(TARGET)
 
-# Ejecutar el programa
-run:
-	./$(TARGET) img.jpg xxx.jpg -angulo 90 -escalar 2 -no-buddy
+# Ejecutar el programa buddy system
+run_buddy:
+	./$(TARGET) img.jpg result.jpg -angulo 9.5 -escalar 2 -buddy
+
+# Ejecutar el programa con new/delete
+run_nobuddy:
+	./$(TARGET) img.jpg result.jpg -angulo 9.5 -escalar 2 -no-buddy

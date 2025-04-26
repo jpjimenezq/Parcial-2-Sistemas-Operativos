@@ -4,92 +4,122 @@
 #include <chrono>
 #include <cstring>
 #include <cstdlib>
+#include <sys/resource.h>
+#include <iomanip>
 
 using namespace std;
 using namespace std::chrono;
 
 void mostrarUso() {
-    cout << "Uso: ./programa_imagen <entrada> <salida> -angulo <grados> -escalar <factor> <-buddy|-no-buddy>\n";
-    cout << "Ejemplo: ./programa_imagen entrada.jpg salida.jpg -angulo 90 -escalar 1.5 -buddy\n";
+    cout << "Uso: ./programa_imagen <entrada> <salida> [-angulo <grados>] [-escalar <factor>] [-buddy|-no-buddy]\n";
 }
 
-void mostrarListaChequeo(const string &entrada, const string &salida, float angulo, float escala, bool usarBuddy) {
-    cout << "\n=== LISTA DE CHEQUEO ===\n";
-    cout << "Archivo de entrada : " << entrada << endl;
-    cout << "Archivo de salida  : " << salida << endl;
-    cout << "Ángulo de rotación : " << angulo << "°" << endl;
-    cout << "Factor de escala   : " << escala << endl;
-    cout << "Modo de asignación : " << (usarBuddy ? "Buddy System" : "new/delete") << endl;
-    cout << "------------------------\n";
+size_t getMemoryUsage() {
+    struct rusage usage;
+    getrusage(RUSAGE_SELF, &usage);
+    return usage.ru_maxrss;
+}
+
+void procesarArgumentos(int argc, char* argv[], bool& usarBuddy, float& angulo, bool& rotar, bool& escalar, float& factorEscala) {
+    usarBuddy = false;
+    angulo = 0.0f;
+    factorEscala = 1.0f;
+    rotar = false;
+    escalar = false;
+
+    for (int i = 3; i < argc; i++) {
+        if (strcmp(argv[i], "-angulo") == 0 && i + 1 < argc) {
+            angulo = atof(argv[++i]);
+            rotar = true;
+        } else if (strcmp(argv[i], "-escalar") == 0 && i + 1 < argc) {
+            factorEscala = atof(argv[++i]);
+            escalar = true;
+        } else if (strcmp(argv[i], "-buddy") == 0) {
+            usarBuddy = true;
+        } else if (strcmp(argv[i], "-no-buddy") == 0) {
+            usarBuddy = false;
+        }
+    }
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 8) {
-        cerr << "Error: Número incorrecto de argumentos.\n";
+    if (argc < 3) {
         mostrarUso();
         return 1;
     }
 
     string archivoEntrada = argv[1];
     string archivoSalida = argv[2];
-    string opcionAngulo = argv[3];
-    float angulo = atof(argv[4]);
-    string opcionEscala = argv[5];
-    float factorEscala = atof(argv[6]);
-    string modoAsignacion = argv[7];
-
-    if (opcionAngulo != "-angulo" || opcionEscala != "-escalar") {
-        cerr << "Error: Opciones '-angulo' y '-escalar' requeridas.\n";
-        mostrarUso();
-        return 1;
-    }
-
     bool usarBuddy = false;
-    if (modoAsignacion == "-buddy") usarBuddy = true;
-    else if (modoAsignacion != "-no-buddy") {
-        cerr << "Error: Opción de asignación inválida.\n";
-        mostrarUso();
-        return 1;
+    float angulo = 0.0f;
+    bool rotar = false;
+    bool escalar = false;
+    float factorEscala = 1.0f;
+
+    procesarArgumentos(argc, argv, usarBuddy, angulo, rotar, escalar, factorEscala);
+
+    cout << "=== PROCESAMIENTO DE IMAGEN ===" << endl;
+    cout << "Archivo de entrada: " << archivoEntrada << endl;
+    cout << "Archivo de salida: " << archivoSalida << endl;
+    cout << "Modo de asignación de memoria: " << (usarBuddy ? "Buddy System" : "new/delete") << endl;
+    cout << "-------------------------------" << endl;
+
+    long tiempoNormal = 0;
+    size_t memNormal = 0;
+
+    {
+        size_t memInicio = getMemoryUsage();
+        auto inicio = high_resolution_clock::now();
+
+        Imagen imgNormal(archivoEntrada);
+        if (rotar) imgNormal.rotar(angulo);
+        if (escalar) imgNormal.escalar(factorEscala);
+
+        tiempoNormal = duration_cast<milliseconds>(high_resolution_clock::now() - inicio).count();
+        memNormal = getMemoryUsage() - memInicio;
+
+        imgNormal.mostrarInfo();
+        if (rotar) cout << "Ángulo de rotación: " << angulo << " grados\n";
+        if (escalar) cout << "Factor de escalado: " << factorEscala << endl;
+        cout << "-------------------------------" << endl;
+        imgNormal.guardarImagen("new_" + archivoSalida);
     }
 
-    mostrarListaChequeo(archivoEntrada, archivoSalida, angulo, factorEscala, usarBuddy);
-    auto inicio = high_resolution_clock::now();
+    long tiempoBuddy = 0;
+    size_t memBuddy = 0;
 
     if (usarBuddy) {
-        BuddyAllocator allocador(32 * 1024 * 1024);
+        size_t memInicio = getMemoryUsage();
+        auto inicio = high_resolution_clock::now();
+
+        BuddyAllocator allocador(4 * 1024 * 1024);
         Imagen img(archivoEntrada, &allocador);
+        if (rotar) img.rotar(angulo);
+        if (escalar) img.escalar(factorEscala);
 
-        if (static_cast<int>(angulo) % 360 != 0) img.rotar();
+        tiempoBuddy = duration_cast<milliseconds>(high_resolution_clock::now() - inicio).count();
+        memBuddy = getMemoryUsage() - memInicio;
 
-        if (factorEscala != 1.0f) {
-            cout << "\n[ANTES DE ESCALAR]\n";
-            img.mostrarInfo();
-            img.escalar(factorEscala);
-            cout << "\n[DESPUÉS DE ESCALAR]\n";
-            img.mostrarInfo();
-        }
-
-        img.guardarImagen(archivoSalida);
-    } else {
-        Imagen img(archivoEntrada);
-
-        if (static_cast<int>(angulo) % 360 != 0) img.rotar();
-
-        if (factorEscala != 1.0f) {
-            cout << "\n[ANTES DE ESCALAR]\n";
-            img.mostrarInfo();
-            img.escalar(factorEscala);
-            cout << "\n[DESPUÉS DE ESCALAR]\n";
-            img.mostrarInfo();
-        }
-
-        img.guardarImagen(archivoSalida);
+        img.mostrarInfo();
+        if (rotar) cout << "Ángulo de rotación: " << angulo << " grados\n";
+        if (escalar) cout << "Factor de escalado: " << factorEscala << endl;
+        cout << "-------------------------------" << endl;
+        img.guardarImagen("buddy_" + archivoSalida);
     }
 
-    auto fin = high_resolution_clock::now();
-    auto duracion = duration_cast<milliseconds>(fin - inicio).count();
+    cout << "\n=== RESULTADOS ===\n";
+    cout << "TIEMPO DE PROCESAMIENTO:" << endl;
+    cout << " - Sin Buddy System: " << tiempoNormal << " ms" << endl;
+    if (usarBuddy) cout << " - Con Buddy System: " << tiempoBuddy << " ms" << endl;
 
-    cout << "\nTiempo total de procesamiento: " << duracion << " ms\n";
-    cout << "[INFO] Proceso completado con éxito.\n";
+    cout << "\nMEMORIA UTILIZADA:" << endl;
+    cout << fixed << setprecision(2);
+    cout << " - Sin Buddy System: " << memNormal / 1024.0 << " MB" << endl;
+    if (usarBuddy) cout << " - Con Buddy System: " << memBuddy / 1024.0 << " MB" << endl;
+
+    cout << "\n[INFO] Imagen guardada correctamente como ";
+    if (usarBuddy) cout << "'buddy_" << archivoSalida << "' y 'new_" << archivoSalida << "'" << endl;
+    else cout << "'new_" << archivoSalida << "'" << endl;
+
     return 0;
 }

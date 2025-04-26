@@ -91,30 +91,70 @@ void Imagen::invertirColores() {
     }
 }
 
-void Imagen::rotar() {
-    unsigned char*** nuevaMatriz = new unsigned char**[ancho];
-    for (int x = 0; x < ancho; x++) {
-        nuevaMatriz[x] = new unsigned char*[alto];
-        for (int y = 0; y < alto; y++) {
-            nuevaMatriz[x][y] = new unsigned char[canales];
-            for (int c = 0; c < canales; c++) {
-                nuevaMatriz[x][y][c] = pixeles[alto - 1 - y][x][c];
+void Imagen::rotar(float grados) {
+    float rad = grados * M_PI / 180.0f;
+
+    float cosA = std::fabs(std::cos(rad));
+    float sinA = std::fabs(std::sin(rad));
+
+    int nuevoAncho = static_cast<int>(ancho * cosA + alto * sinA);
+    int nuevoAlto  = static_cast<int>(ancho * sinA + alto * cosA);
+
+    // Crear nueva matriz de pixeles
+    unsigned char*** nuevaMatriz = new unsigned char**[nuevoAlto];
+    for (int y = 0; y < nuevoAlto; ++y) {
+        nuevaMatriz[y] = new unsigned char*[nuevoAncho];
+        for (int x = 0; x < nuevoAncho; ++x) {
+            nuevaMatriz[y][x] = new unsigned char[canales];
+            // Inicializar a negro
+            for (int c = 0; c < canales; ++c) {
+                nuevaMatriz[y][x][c] = 0;
+            }
+        }
+    }
+
+    // Centros
+    float cxOld = ancho / 2.0f;
+    float cyOld = alto / 2.0f;
+    float cxNew = nuevoAncho / 2.0f;
+    float cyNew = nuevoAlto / 2.0f;
+
+    for (int y = 0; y < nuevoAlto; ++y) {
+        for (int x = 0; x < nuevoAncho; ++x) {
+            // Coordenadas relativas al centro nuevo
+            float dx = x - cxNew;
+            float dy = y - cyNew;
+
+            // Inversa de rotación
+            float srcX =  cos(rad) * dx + sin(rad) * dy + cxOld;
+            float srcY = -sin(rad) * dx + cos(rad) * dy + cyOld;
+
+            int isrcX = static_cast<int>(srcX);
+            int isrcY = static_cast<int>(srcY);
+
+            if (isrcX >= 0 && isrcX < ancho && isrcY >= 0 && isrcY < alto) {
+                for (int c = 0; c < canales; ++c) {
+                    nuevaMatriz[y][x][c] = pixeles[isrcY][isrcX][c];
+                }
             }
         }
     }
 
     // Liberar la matriz actual
-    for (int y = 0; y < alto; y++) {
-        for (int x = 0; x < ancho; x++) {
+    for (int y = 0; y < alto; ++y) {
+        for (int x = 0; x < ancho; ++x) {
             delete[] pixeles[y][x];
         }
         delete[] pixeles[y];
     }
     delete[] pixeles;
 
-    // Actualizar puntero y dimensiones
-    std::swap(ancho, alto);
+    // Asignar nueva matriz
     pixeles = nuevaMatriz;
+    ancho = nuevoAncho;
+    alto = nuevoAlto;
+
+    std::cout << "[INFO] Imagen rotada " << grados << " grados (" << nuevoAncho << "x" << nuevoAlto << ").\n";
 }
 
 void Imagen::escalar(float factor) {
